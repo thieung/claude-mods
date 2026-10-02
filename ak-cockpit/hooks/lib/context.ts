@@ -1,9 +1,13 @@
-/** The weather word for a context fill, after Token Weather's scale, with the handoff threshold as the storm line. */
-export function forecast(percent: number, threshold: number): { glyph: string; color: string } {
-  if (percent >= threshold) return { glyph: '↯', color: 'red' }
-  if (percent >= threshold - 15) return { glyph: '☂', color: 'yellow' }
-  if (percent >= 25) return { glyph: '☁', color: 'white' }
-  return { glyph: '☀', color: 'green' }
+/**
+ * The weather glyph for a context fill, after Token Weather's scale, with the handoff threshold as the storm line.
+ * Calm levels keep the surface's own text color so they read on light and dark themes alike;
+ * only the two warning levels take a theme color.
+ */
+export function forecast(percent: number, threshold: number): { glyph: string; color?: 'warning' | 'error' } {
+  if (percent >= threshold) return { glyph: '↯', color: 'error' }
+  if (percent >= threshold - 15) return { glyph: '☂', color: 'warning' }
+  if (percent >= 25) return { glyph: '☁' }
+  return { glyph: '☀' }
 }
 
 /** `4.1k`, `820`, `-1.2k`: a signed token count short enough for one band. */

@@ -76,7 +76,8 @@ describe('helpers', () => {
     ])
   })
   test('forecast turns red at the threshold', () => {
-    expect(forecast(74, 75).color).toBe('yellow')
+    expect(forecast(74, 75).color).toBe('warning')
+    expect(forecast(40, 75).color).toBeUndefined()
     expect(forecast(75, 75).glyph).toBe('↯')
     expect(shortTokens(4100)).toBe('+4.1k')
   })
@@ -111,6 +112,11 @@ describe('band', () => {
     await turn($)
     expect(w.toasts.length).toBe(1)
     expect(w.toasts[0]).toContain('/ak:handoff')
+    for (const surface of ['terminal', 'desktop'] as const) {
+      const hot = await $.ui.mount({ plugin: 'ak-cockpit', surface, component: 'AbovePrompt', props: BAND })
+      expect((await hot.find({ type: 'Text', text: /Context 80%/ }))?.props.color).toBe('error')
+      await hot.unmount()
+    }
     const ui = await $.ui.mount({ plugin: 'ak-cockpit', surface: 'terminal', component: 'AbovePrompt', props: BAND })
     expect((await ui.find({}))?.text).toContain('(+4.0k)')
     await ui.press({ key: 'handoff' })

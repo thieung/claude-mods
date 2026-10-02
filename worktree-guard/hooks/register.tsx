@@ -256,7 +256,7 @@ export const register: Register = on => {
     const hidden = groups.length - MAX_GROUPS
     return (
       <Box flexDirection="column" width={e.props.bodyColumns}>
-        <Text key="summary" bold color="yellow" wrap="truncate-end">{summary(held)}</Text>
+        <Text key="summary" bold color="warning" wrap="truncate-end">{summary(held)}</Text>
         <Text key="command" dimColor wrap="truncate-middle">$ {shortCommand(held.command)}</Text>
         <Box key="actions" gap={1}>
           <Button key="expand" label={expanded ? 'Thu gọn' : 'Xem hết'} onPress={() => update($, isExpanded, v => !v)} />
@@ -273,7 +273,7 @@ export const register: Register = on => {
           </Box>
         )}
         {held.kind === 'stage' && held.mine.length > 0 && (
-          <Text key="suggest" color="green" wrap="truncate-end">→ git add {held.mine.map(shellQuote).join(' ')}</Text>
+          <Text key="suggest" bold wrap="truncate-end">→ git add {held.mine.map(shellQuote).join(' ')}</Text>
         )}
       </Box>
     )
@@ -289,7 +289,7 @@ export const register: Register = on => {
     const { Box, Text } = $.ui.resolve(e)
     return (
       <Box flexDirection="column">
-        <Text key="guard" color="yellow" wrap="truncate-end">{summary(held)} · /guard-files để xem hết</Text>
+        <Text key="guard" color="warning" wrap="truncate-end">{summary(held)} · /guard-files để xem hết</Text>
         {below}
       </Box>
     )
