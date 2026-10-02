@@ -6,5 +6,16 @@
   "author": {
     "name": "Thieu Nguyen"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "homepage": "https://github.com/thieung/claude-mods/tree/main/worktree-guard",
+  "repository": "https://github.com/thieung/claude-mods",
+  "documentationUrl": "https://github.com/thieung/claude-mods/blob/main/worktree-guard/README.md",
+  "supportUrl": "https://github.com/thieung/claude-mods/issues",
+  "keywords": [
+    "git",
+    "worktree",
+    "safety",
+    "multi-session",
+    "mod"
+  ]
 }
