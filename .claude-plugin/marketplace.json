@@ -20,6 +20,13 @@
       "description": "AgentKit cockpit above the prompt: context fill with a handoff nudge, and the active plan's phase and checklist.",
       "version": "0.1.0",
       "license": "MIT"
+    },
+    {
+      "name": "ghost-proc-guard",
+      "source": "./ghost-proc-guard",
+      "description": "Stops Claude from starting a second copy of your dev servers on the next free port (monorepos and worktrees included), tracks the servers it starts, and stops leftovers from a /procs pane.",
+      "version": "0.1.0",
+      "license": "MIT"
     }
   ]
 }

@@ -1,0 +1,21 @@
+{
+  "name": "ghost-proc-guard",
+  "version": "0.1.0",
+  "description": "Stops Claude from starting a second copy of your dev servers on the next free port (monorepos and worktrees included), tracks the servers it starts, and stops leftovers from a /procs pane.",
+  "types": "./types/index.d.ts",
+  "author": {
+    "name": "Thieu Nguyen"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/thieung/claude-mods/tree/main/ghost-proc-guard",
+  "repository": "https://github.com/thieung/claude-mods",
+  "documentationUrl": "https://github.com/thieung/claude-mods/blob/main/ghost-proc-guard/README.md",
+  "supportUrl": "https://github.com/thieung/claude-mods/issues",
+  "keywords": [
+    "dev-server",
+    "ports",
+    "monorepo",
+    "worktree",
+    "mod"
+  ]
+}
