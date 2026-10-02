@@ -1,0 +1,14 @@
+{
+  "name": "thieung-mods",
+  "owner": { "name": "Thieu Nguyen" },
+  "metadata": { "description": "Claude Code mods by Thieu Nguyen." },
+  "plugins": [
+    {
+      "name": "worktree-guard",
+      "source": "./worktree-guard",
+      "description": "Guards a shared worktree: stops `git add -A` from staging files this session did not touch, previews destructive git commands, and points at the process holding a busy port.",
+      "version": "0.1.0",
+      "license": "MIT"
+    }
+  ]
+}

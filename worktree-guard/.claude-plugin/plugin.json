@@ -1,0 +1,10 @@
+{
+  "name": "worktree-guard",
+  "version": "0.1.0",
+  "description": "Guards a shared worktree: stops `git add -A` from staging files this session did not touch, previews destructive git commands, and points at the process holding a busy port.",
+  "types": "./types/index.d.ts",
+  "author": {
+    "name": "Thieu Nguyen"
+  },
+  "license": "MIT"
+}
