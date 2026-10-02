@@ -1,0 +1,16 @@
+{
+  "name": "ak-cockpit",
+  "version": "0.1.0",
+  "description": "AgentKit cockpit above the prompt: context fill with a handoff nudge, and the active plan's phase and checklist.",
+  "author": { "name": "Thieu Nguyen" },
+  "license": "MIT",
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "handoffPercent": {
+      "type": "number",
+      "title": "Handoff threshold (%)",
+      "description": "Context fill at which the band turns red and suggests /ak:handoff.",
+      "default": 75
+    }
+  }
+}
