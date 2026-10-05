@@ -3,380 +3,345 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="description" content="Claude Code mods by Thieu Nguyen: ghost-proc-guard keeps one dev server per checkout; worktree-guard and ak-cockpit.">
-<style>html{color-scheme:light dark}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
 <title>claude-mods</title>
+<meta name="description" content="Claude Code mods by Thieu Nguyen: ghost-proc-guard stops duplicate dev servers, worktree-guard keeps sessions from committing or discarding each other's work, ak-cockpit shows context fill and the active plan.">
+<meta property="og:title" content="claude-mods: small mods for crowded checkouts">
+<meta property="og:description" content="Three Claude Code mods for shared worktrees and long sessions.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://thieung.github.io/claude-mods/">
+<link rel="canonical" href="https://thieung.github.io/claude-mods/">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='4' width='26' height='6' rx='1.5' fill='%233a4fd8'/%3E%3Crect x='3' y='13' width='26' height='6' rx='1.5' fill='%23161b33'/%3E%3Crect x='3' y='22' width='26' height='6' rx='1.5' fill='%23e8a33d'/%3E%3C/svg%3E">
+<script>try{var t=localStorage.getItem('gpg-theme');if(t==='light'||t==='dark')document.documentElement.dataset.theme=t;var l=localStorage.getItem('gpg-lang');if(l==='vi'||l==='en')document.documentElement.lang=l}catch(e){}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@500;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800;900&family=Atkinson+Hyperlegible+Next:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap">
 <style>
-/* Layout: a single reading column with wide "screens" (terminal and pane mocks) that break out beside the copy on desktop. */
+/* Shares its tokens with ghost-proc-guard/index.html so the site reads as one family. */
 :root {
-  --paper: #eef1f5;
-  --panel: #ffffff;
-  --ink: #14202e;
-  --muted: #566476;
-  --rule: #cfd7e1;
-  --accent: #a8520a;
-  --accent-soft: #f6e3cf;
-  --ok: #2c7a4b;
-  --term-bg: #17212d;
-  --term-fg: #d9e2ec;
-  --term-dim: #8b9aab;
-  --term-warn: #f0a33a;
-  --term-ok: #6fcf97;
-  --font-display: "Schibsted Grotesk", "Helvetica Neue", Arial, sans-serif;
-  --font-body: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
-  --font-code: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
-  --step--1: 0.875rem;
-  --step-0: 1.0625rem;
-  --step-1: 1.3rem;
-  --step-2: 1.75rem;
-  --step-3: clamp(2.2rem, 5.5vw, 3.6rem);
+  --fog: #dde3ec;
+  --panel: #f3f6fa;
+  --ink: #161b33;
+  --muted: #4c5677;
+  --rule: #b9c3d4;
+  --cobalt: #3a4fd8;
+  --stop: #c92a3e;
+  --stop-wash: #f8dde1;
+  --board: #161b33;
+  --board-ink: #e8ecf8;
+  --board-dim: #8e97b8;
+  --board-rule: #2b3256;
+  --display: "Big Shoulders Display", "Arial Narrow", sans-serif;
+  --body: "Atkinson Hyperlegible Next", "Helvetica Neue", Arial, sans-serif;
+  --code: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --paper: #0f1620; --panel: #151f2b; --ink: #e3e9f0; --muted: #96a4b4; --rule: #263342;
-    --accent: #f0a33a; --accent-soft: #33261a; --ok: #6fcf97;
-    --term-bg: #0a1018; --term-fg: #d9e2ec; --term-dim: #7d8c9d; --term-warn: #f0a33a; --term-ok: #6fcf97;
+    --fog: #12162b; --panel: #1a2040; --ink: #e6eaf7; --muted: #a3abc9; --rule: #2e3660;
+    --cobalt: #8d9cff; --stop: #ff6b7d; --stop-wash: #3a1d2a;
+    --board: #0c0f1f; --board-rule: #262c4d;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --paper: #0f1620; --panel: #151f2b; --ink: #e3e9f0; --muted: #96a4b4; --rule: #263342;
-  --accent: #f0a33a; --accent-soft: #33261a; --ok: #6fcf97;
-  --term-bg: #0a1018; --term-fg: #d9e2ec; --term-dim: #7d8c9d; --term-warn: #f0a33a; --term-ok: #6fcf97;
+  --fog: #12162b; --panel: #1a2040; --ink: #e6eaf7; --muted: #a3abc9; --rule: #2e3660;
+  --cobalt: #8d9cff; --stop: #ff6b7d; --stop-wash: #3a1d2a;
+  --board: #0c0f1f; --board-rule: #262c4d;
   color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
-body {
-  background: var(--paper);
-  color: var(--ink);
-  font-family: var(--font-body);
-  font-size: var(--step-0);
-  line-height: 1.6;
-  padding-inline: 20px;
-  padding-block: 0 64px;
-}
-a { color: inherit; text-decoration-color: var(--accent); text-underline-offset: 3px; }
-a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
-.wrap { max-width: 1080px; margin-inline: auto; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--fog); color: var(--ink); font: 400 1.0625rem/1.6 var(--body); overflow-x: hidden; }
+a { color: inherit; text-decoration-color: var(--cobalt); text-underline-offset: 3px; text-decoration-thickness: 2px; }
+a:hover { color: var(--cobalt); }
+:focus-visible { outline: 3px solid var(--cobalt); outline-offset: 3px; }
+code { font-family: var(--code); font-size: 0.88em; }
+img { display: block; max-width: 100%; }
+.wrap { max-width: 1180px; margin-inline: auto; padding-inline: 16px; }
+@media (min-width: 720px) { .wrap { padding-inline: 32px; } }
 
-header.site {
-  display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap;
-  padding-block: 22px; border-bottom: 1px solid var(--rule);
+.site { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; padding-block: 20px; }
+.mark { font: 800 1.5rem/1 var(--display); letter-spacing: 0.01em; text-decoration: none; }
+.mark span { font: 400 0.95rem var(--body); color: var(--muted); margin-left: 8px; letter-spacing: 0; }
+.site nav { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 22px; font-size: 0.95rem; }
+.prefs { display: inline-flex; gap: 8px; }
+.pref {
+  appearance: none; display: inline-flex; align-items: center; gap: 6px; background: transparent; color: var(--ink);
+  border: 1.5px solid var(--rule); border-radius: 5px; padding: 6px 10px; font: 700 0.85rem/1 var(--body); cursor: pointer;
 }
-.brand { font-family: var(--font-display); font-weight: 800; font-size: var(--step-1); letter-spacing: -0.01em; }
-.brand span { color: var(--muted); font-weight: 500; }
-header.site nav { display: flex; gap: 20px; font-size: var(--step--1); }
+.pref:hover { border-color: var(--cobalt); color: var(--cobalt); }
+.pref svg { width: 15px; height: 15px; }
 
-h1, h2, h3 { font-family: var(--font-display); line-height: 1.1; text-wrap: balance; margin: 0; }
-h1 { font-size: var(--step-3); font-weight: 800; letter-spacing: -0.025em; }
-h2 { font-size: var(--step-2); font-weight: 800; letter-spacing: -0.015em; }
-h3 { font-size: var(--step-1); font-weight: 700; }
+h1, h2, h3 { margin: 0; font-family: var(--display); line-height: 0.95; text-wrap: balance; }
+h1 { font-weight: 900; font-size: clamp(3.2rem, 9vw, 6.4rem); }
+h2 { font-weight: 800; font-size: clamp(2.2rem, 5vw, 3.4rem); }
+:lang(vi) h1 { font-size: clamp(3rem, 7.4vw, 5.4rem); line-height: 1.02; }
+:lang(vi) h2, :lang(vi) .mod h3 { line-height: 1.05; }
 p { margin: 0; max-width: 62ch; }
-.lede { font-size: var(--step-1); line-height: 1.45; color: var(--muted); max-width: 46ch; }
 
-.hero {
-  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 48px; align-items: center;
-  padding-block: 56px 64px;
-}
-.hero-copy { display: flex; flex-direction: column; gap: 22px; min-width: 0; }
-.mod-tag {
-  align-self: flex-start; display: inline-flex; align-items: center; gap: 10px;
-  font-size: var(--step--1); font-weight: 600; color: var(--accent);
-}
-.lamp { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+.hero { display: grid; gap: 40px; padding-block: 40px 80px; align-items: center; }
+@media (min-width: 980px) { .hero { grid-template-columns: 1fr 1fr; gap: 64px; padding-top: 72px; } }
+.hero > *, .mod > *, .pick > *, .mods-head > * { min-width: 0; }
+.lede { margin-top: 24px; font-size: 1.25rem; line-height: 1.5; color: var(--muted); max-width: 42ch; }
+.lede + p { margin-top: 16px; color: var(--muted); }
 
-.install { display: flex; flex-direction: column; gap: 8px; }
-.install-label { font-size: var(--step--1); color: var(--muted); }
-.snippet {
-  position: relative; background: var(--term-bg); color: var(--term-fg); border-radius: 6px;
-  font-family: var(--font-code); font-size: 0.9rem; line-height: 1.7; padding: 14px 16px; overflow-x: auto;
-}
-.snippet pre { margin: 0; padding-right: 72px; }
-.copy {
-  position: absolute; top: 10px; right: 10px; border: 1px solid #3a4858; background: transparent; color: var(--term-fg);
-  font: 500 0.8rem var(--font-body); padding: 5px 10px; border-radius: 4px; cursor: pointer;
-}
-.copy:hover { border-color: var(--term-warn); color: var(--term-warn); }
+/* Install panel */
+.board { background: var(--board); color: var(--board-ink); border-radius: 10px; overflow: hidden; box-shadow: 0 30px 60px -30px rgba(22, 27, 51, 0.55); }
+.board-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--board-rule); }
+.board-title { font: 800 1.35rem/1 var(--display); letter-spacing: 0.02em; }
+.board pre { margin: 0; padding: 20px; font: 0.9rem/1.9 var(--code); overflow-x: auto; }
+.board pre .d { color: var(--board-dim); }
+.board-foot { padding: 14px 20px 18px; border-top: 1px solid var(--board-rule); font-size: 0.9rem; color: var(--board-dim); }
+.copy { appearance: none; border: 0; border-radius: 6px; background: var(--board-ink); color: var(--board); font: 700 0.9rem/1 var(--body); padding: 10px 14px; cursor: pointer; }
+.copy:hover { background: #fff; }
+.board { border: 1px solid var(--board-rule); }
+@media (max-width: 480px) { .board pre { font-size: 0.7rem; padding: 16px; } }
 
-.screen {
-  background: var(--term-bg); color: var(--term-fg); border-radius: 8px; font-family: var(--font-code);
-  font-size: 0.82rem; line-height: 1.65; overflow: hidden; min-width: 0;
-  box-shadow: 0 1px 0 var(--rule), 0 24px 48px -28px rgba(10, 20, 35, 0.55);
-}
-.screen-bar {
-  display: flex; justify-content: space-between; gap: 12px; padding: 9px 14px; border-bottom: 1px solid #263342;
-  font-family: var(--font-body); font-size: 0.78rem; color: var(--term-dim);
-}
-.screen-body { padding: 14px 16px 16px; overflow-x: auto; }
-.screen-body pre { margin: 0; white-space: pre; }
-.t-dim { color: var(--term-dim); }
-.t-warn { color: var(--term-warn); }
-.t-ok { color: var(--term-ok); }
-.t-strong { color: #ffffff; font-weight: 500; }
+section.block { padding-block: 72px; border-top: 2px solid var(--ink); }
 
-.more-link { margin-top: auto; font-weight: 600; font-size: 0.95rem; }
-section.block { padding-block: 56px; border-top: 1px solid var(--rule); display: grid; gap: 28px; }
-.block-head { display: grid; gap: 10px; }
+/* Problem picker */
+.pick { display: grid; gap: 28px; }
+@media (min-width: 900px) { .pick { grid-template-columns: 300px 1fr; gap: 56px; } }
+.pick header p { margin-top: 14px; color: var(--muted); }
+.cases { list-style: none; margin: 0; padding: 0; }
+.cases li { display: grid; gap: 6px 28px; padding: 18px 0; border-bottom: 1px solid var(--rule); }
+.cases li:first-child { padding-top: 0; }
+@media (min-width: 720px) { .cases li { grid-template-columns: 1fr 200px; align-items: baseline; } }
+.cases a { font: 800 1.35rem/1.1 var(--display); text-decoration: none; color: var(--cobalt); }
+.cases a:hover { text-decoration: underline; }
 
-.cases { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
-.case { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-.case p { color: var(--muted); font-size: 0.98rem; }
-.verdict {
-  margin-top: auto; background: var(--panel); border: 1px solid var(--rule); border-radius: 6px; padding: 12px 14px;
-  font-family: var(--font-code); font-size: 0.78rem; line-height: 1.55; overflow-x: auto;
-}
-.verdict b { color: var(--accent); font-weight: 500; }
+/* Mod rows */
+.mods-head { display: grid; gap: 14px; margin-bottom: 40px; }
+@media (min-width: 900px) { .mods-head { grid-template-columns: 300px 1fr; gap: 56px; align-items: end; } }
+.mods-head p { color: var(--muted); }
+.mod { display: grid; gap: 20px; padding-block: 40px; border-top: 1px solid var(--rule); }
+@media (min-width: 900px) { .mod { grid-template-columns: 96px 1fr 1fr; gap: 40px; } }
+.mod img { width: 72px; height: 72px; border-radius: 16px; }
+@media (min-width: 900px) { .mod img { width: 96px; height: 96px; border-radius: 20px; } }
+.mod h3 { font-weight: 900; font-size: clamp(2.2rem, 4.5vw, 3rem); }
+.mod .sum { margin-top: 12px; font-size: 1.1rem; }
+.mod .needs { margin-top: 12px; font-size: 0.95rem; color: var(--muted); }
+.mod ul { margin: 0; padding-left: 1.1em; }
+.mod li + li { margin-top: 10px; }
+.mod .go { margin-top: 18px; display: flex; flex-wrap: wrap; gap: 10px 20px; font-weight: 700; }
+.line { margin-top: 18px; display: block; padding: 10px 14px; border: 1.5px solid var(--rule); border-radius: 6px; background: var(--panel); font: 0.85rem/1.5 var(--code); overflow-x: auto; white-space: nowrap; }
 
-.split { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); gap: 40px; align-items: start; }
-.split > div { display: grid; gap: 16px; min-width: 0; }
-.split ul { margin: 0; padding-left: 1.1em; display: grid; gap: 8px; max-width: 58ch; }
+.note { margin-top: 28px; padding: 14px 16px; border-left: 4px solid var(--stop); background: var(--stop-wash); border-radius: 0 6px 6px 0; font-size: 0.95rem; max-width: 70ch; }
 
-.pane-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
-.pane-btn {
-  font-family: var(--font-code); font-size: 0.78rem; color: var(--term-fg); border: 1px solid #3a4858;
-  border-radius: 3px; padding: 0 6px; line-height: 1.5;
-}
-.pane-head { color: #ffffff; font-family: var(--font-body); font-weight: 600; font-size: 0.85rem; margin-bottom: 4px; }
-.pane-group + .pane-group { margin-top: 14px; }
+footer { border-top: 2px solid var(--ink); padding-block: 28px 48px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; font-size: 0.92rem; color: var(--muted); }
 
-.table-wrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 6px; background: var(--panel); }
-table { border-collapse: collapse; width: 100%; font-size: 0.95rem; }
-th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--rule); vertical-align: top; }
-th { font-family: var(--font-body); font-weight: 600; font-size: var(--step--1); color: var(--muted); letter-spacing: 0.02em; }
-tr:last-child td { border-bottom: 0; }
-td.port { font-family: var(--font-code); font-variant-numeric: tabular-nums; white-space: nowrap; }
-code { font-family: var(--font-code); font-size: 0.88em; background: var(--accent-soft); padding: 1px 5px; border-radius: 3px; }
-
-.order { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; background: var(--panel); }
-.order div { padding: 16px; display: grid; gap: 6px; min-width: 0; }
-.order div + div { border-left: 1px solid var(--rule); }
-.order h3 { font-size: 1.05rem; }
-.order p { font-size: 0.93rem; color: var(--muted); }
-.order .arrow { color: var(--accent); font-weight: 700; }
-
-.limits { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 32px; margin: 0; padding: 0; list-style: none; }
-.limits li { padding-left: 16px; border-left: 2px solid var(--rule); color: var(--muted); font-size: 0.97rem; }
-
-footer { border-top: 1px solid var(--rule); padding-block: 28px 0; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; font-size: var(--step--1); color: var(--muted); }
-
-@media (max-width: 860px) {
-  .hero, .split { grid-template-columns: minmax(0, 1fr); gap: 32px; }
-  .cases { grid-template-columns: minmax(0, 1fr); }
-  .order { grid-template-columns: minmax(0, 1fr); }
-  .order div + div { border-left: 0; border-top: 1px solid var(--rule); }
-  .limits { grid-template-columns: minmax(0, 1fr); }
-  .hero { padding-block: 36px 48px; }
-}
-@media (prefers-reduced-motion: no-preference) {
-  .lamp { animation: blink 2.4s ease-in-out infinite; }
-  @keyframes blink { 50% { box-shadow: 0 0 0 7px var(--accent-soft); } }
-}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 </style>
 </head>
 <body>
-
 <div class="wrap">
   <header class="site">
-    <div class="brand">claude-mods <span>by Thieu Nguyen</span></div>
-    <nav aria-label="Links">
-      <a href="#ghost-proc-guard">ghost-proc-guard</a>
-      <a href="#more-mods">More mods</a>
+    <a class="mark" href="#top">claude-mods<span data-i18n="by">by Thieu Nguyen</span></a>
+    <nav aria-label="Site">
+      <a href="#mods" data-i18n="nav_mods">Mods</a>
       <a href="https://github.com/thieung/claude-mods">GitHub</a>
-      <a href="https://claude.dev/blog/getting-started-with-claude-code-mods/">What are mods?</a>
+      <span class="prefs">
+        <button class="pref" id="lang" type="button"></button>
+        <button class="pref" id="theme" type="button"></button>
+      </span>
     </nav>
   </header>
 
-  <main>
-    <section class="hero" id="ghost-proc-guard">
-      <div class="hero-copy">
-        <span class="mod-tag"><span class="lamp" aria-hidden="true"></span>ghost-proc-guard · port busy</span>
-        <h1>One dev server per checkout.</h1>
-        <p class="lede">A Claude Code mod that stops Claude from starting a second copy of your app on the next free port, and cleans up the servers earlier sessions left running.</p>
-        <div class="install">
-          <span class="install-label">Install in Claude Code 2.1.287 or later</span>
-          <div class="snippet">
-            <pre id="install-cmd">/plugin marketplace add thieung/claude-mods
+  <main id="top">
+    <div class="hero">
+      <div>
+        <h1 data-i18n="h1">Small mods for crowded checkouts.</h1>
+        <p class="lede" data-i18n="lede">When several Claude sessions share one checkout, they start duplicate servers, commit each other's half-done files and lose track of long plans. These mods catch those moments inside Claude Code.</p>
+        <p data-i18n="what">Mods are plugins of function hooks that run inside Claude Code. <a href="https://claude.dev/blog/getting-started-with-claude-code-mods/">What are mods?</a></p>
+      </div>
+      <div class="board" aria-labelledby="install-title">
+        <div class="board-top">
+          <div class="board-title" id="install-title" data-i18n="install_t">Install</div>
+          <button class="copy" id="copy" type="button" data-copy="all-cmds"></button>
+        </div>
+<pre id="all-cmds">/plugin marketplace add thieung/claude-mods
 /plugin install ghost-proc-guard@thieung-mods
+/plugin install worktree-guard@thieung-mods
+/plugin install ak-cockpit@thieung-mods
 /reload-plugins</pre>
-            <button class="copy" type="button" id="copy-install" data-target="install-cmd">Copy</button>
-          </div>
-        </div>
+        <div class="board-foot" data-i18n="install_foot">Run inside Claude Code 2.1.287 or later. Install only the mods you need.</div>
       </div>
+    </div>
 
-      <figure class="screen" style="margin:0" aria-label="Claude's Bash call refused by ghost-proc-guard">
-        <div class="screen-bar"><span>Claude Code · agentwiki/.claude/worktrees/wt1</span><span>Bash</span></div>
-        <div class="screen-body"><pre><span class="t-dim">❯</span> <span class="t-strong">nohup pnpm dev &gt; dev.log 2&gt;&amp;1 &amp;</span>
-
-<span class="t-warn">ghost-proc-guard: Ports 5173, 8787 are already in use.</span>
-<span class="t-warn">Not starting another dev server.</span>
-<span class="t-dim">-</span> vite on port 5173 [cwd …/agentwiki/packages/web]
-  <span class="t-warn">[another worktree: …/agentwiki]</span>
-  (started by Claude session e92637be); processes: 85385 85629
-<span class="t-dim">-</span> wrangler dev on port 8787 (also 9229)
-  [cwd …/agentwiki/packages/api] <span class="t-warn">[another worktree: …/agentwiki]</span>
-  (started by Claude session e92637be); processes: 85384 85619 85697 85716
-
-<span class="t-dim">That server runs the code of another worktree, so reusing it
-would test the wrong checkout. Ask the user whether to stop it,
-or give this worktree its own fixed ports.</span></pre></div>
-      </figure>
-    </section>
-
-    <section class="block" aria-labelledby="cases-title">
-      <div class="block-head">
-        <h2 id="cases-title">What it catches</h2>
-        <p>Every case below was reproduced with real headless Claude sessions before release. The guard only steps in when Claude actually tries to launch; when Claude checks first and reuses the running server, nothing is blocked.</p>
-      </div>
-      <div class="cases">
-        <article class="case">
-          <h3>Claude forgets the server is up</h3>
-          <p>After a compaction or a long thread, Claude runs <code>pnpm dev</code> again. Vite would quietly move to 5174 and you would have two copies of every app.</p>
-          <div class="verdict"><b>refused</b> · A server is already listening from …/app (started by this session); processes: 46215</div>
-        </article>
-        <article class="case">
-          <h3>Two sessions, one project</h3>
-          <p>A second Claude session tries to start the app while the first one's servers are still up. It learns who owns them and asks you before stopping anything.</p>
-          <div class="verdict"><b>refused</b> · (started by Claude session 62c1b24c); the owner is another session, so Claude asks first</div>
-        </article>
-        <article class="case">
-          <h3>A worktree reaches for taken ports</h3>
-          <p>In a turbo monorepo the guard reads every package's script and config to know the ports a launch needs, then places each running server in its git worktree.</p>
-          <div class="verdict"><b>refused</b> · Ports 5321, 5322 are already in use [another worktree: …/mono]</div>
-        </article>
+    <section class="block" aria-labelledby="pick-h">
+      <div class="pick">
+        <header>
+          <h2 id="pick-h" data-i18n="pick_h">Which one do you need?</h2>
+          <p data-i18n="pick_p">Start from what went wrong.</p>
+        </header>
+        <ul class="cases">
+          <li><span data-i18n="p1">Claude runs <code>pnpm dev</code> again and your app now runs on :5173 and :5174.</span><a href="ghost-proc-guard/">ghost-proc-guard</a></li>
+          <li><span data-i18n="p2">Servers from last week's sessions are still holding ports.</span><a href="ghost-proc-guard/">ghost-proc-guard</a></li>
+          <li><span data-i18n="p3"><code>git add -A</code> swept another session's half-done files into your commit.</span><a href="#worktree-guard">worktree-guard</a></li>
+          <li><span data-i18n="p4"><code>git stash</code> or <code>reset --hard</code> would throw away work you did not write.</span><a href="#worktree-guard">worktree-guard</a></li>
+          <li><span data-i18n="p5">A command failed with <code>EADDRINUSE</code> and you do not know who holds the port.</span><a href="#worktree-guard">worktree-guard</a></li>
+          <li><span data-i18n="p6">You only notice the context is full when it compacts, and lose your place in the plan.</span><a href="#ak-cockpit">ak-cockpit</a></li>
+        </ul>
       </div>
     </section>
 
-    <section class="block" aria-labelledby="procs-title">
-      <div class="split">
+    <section class="block" id="mods" aria-labelledby="mods-h">
+      <div class="mods-head">
+        <h2 id="mods-h" data-i18n="mods_h">The mods</h2>
+        <p data-i18n="mods_p">None of them makes network calls. Each README lists the programs it runs, the files it reads and what it keeps.</p>
+      </div>
+
+      <article class="mod" id="ghost-proc-guard">
+        <img src="icons/ghost-proc-guard.png" alt="" width="96" height="96">
         <div>
-          <h2 id="procs-title">See and stop what Claude started</h2>
-          <p>Type <code>/procs</code> to open a pane beside the transcript. Each app is one row, however many processes it runs: wrangler's runtime helpers and internal sockets are folded in and hidden.</p>
-          <ul>
-            <li><strong>Stop</strong> sends <code>TERM</code> to the whole app tree; a second press sends <code>KILL</code>.</li>
-            <li>Claude's own processes and your interactive shells are never touched.</li>
-            <li>Every launch carries <code>GHOST_PROC_GUARD_SESSION</code> in its environment, so servers keep their owner even after they are orphaned.</li>
-            <li>A new session warns you about servers earlier sessions left running.</li>
-          </ul>
-        </div>
-        <figure class="screen" style="margin:0" aria-label="The /procs pane">
-          <div class="screen-bar"><span>Dev processes</span><span>/procs</span></div>
-          <div class="screen-body">
-            <div class="pane-group">
-              <div class="pane-head">Started by Claude</div>
-              <div class="pane-row"><span class="t-dim">○ :5173 pid 84071</span><span class="t-dim">session e92637be …/packages/web</span></div>
-              <div class="pane-row"><span class="t-ok">● :5173 pid 12784</span><span class="t-dim">this session …/packages/web</span><span class="pane-btn">Stop</span></div>
-              <div class="pane-row"><span class="t-ok">● :8787 (:9229) pid 12797</span><span class="t-dim">this session …/packages/api</span><span class="pane-btn">Stop</span></div>
-              <div class="pane-row"><span class="t-ok">● :8788 (:9230) pid 12740</span><span class="t-dim">this session …/packages/mcp</span><span class="pane-btn">Stop</span></div>
-              <div class="pane-row"><span class="t-ok">● :4321 pid 12788</span><span class="t-dim">this session …/packages/docs</span><span class="pane-btn">Stop</span></div>
-            </div>
-            <div class="pane-group">
-              <div class="pane-head">Other servers in this project</div>
-              <div class="t-dim">None.</div>
-            </div>
-            <div class="pane-group pane-row"><span class="pane-btn">Refresh</span><span class="pane-btn">Forget stopped</span></div>
-          </div>
-        </figure>
-      </div>
-    </section>
-
-    <section class="block" aria-labelledby="ports-title">
-      <div class="block-head">
-        <h2 id="ports-title">How it knows which ports a launch needs</h2>
-        <p>For a workspace runner (turbo, <code>pnpm -r</code> or <code>--filter</code>, nx, lerna, npm workspaces) it walks every package that runs the task, honours turbo's <code>--filter</code>, and takes the first answer from this order.</p>
-      </div>
-      <div class="order">
-        <div><h3>Script flag</h3><p><code>wrangler dev --port 8788</code>, <code>PORT=4000</code>, <code>vite --port 5175</code></p></div>
-        <div><h3><span class="arrow" aria-hidden="true">→</span> Tool config</h3><p><code>server.port</code> in vite or astro config, <code>[dev] port</code> in wrangler.toml or .jsonc</p></div>
-        <div><h3><span class="arrow" aria-hidden="true">→</span> Tool default</h3><p>The port the tool binds when nothing else says otherwise</p></div>
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th scope="col">Tool</th><th scope="col">Default port</th><th scope="col">Recognised launch</th></tr></thead>
-          <tbody>
-            <tr><td>Vite</td><td class="port">5173</td><td><code>vite</code>, <code>vite dev</code> (<code>vite preview</code> uses 4173)</td></tr>
-            <tr><td>Next.js</td><td class="port">3000</td><td><code>next dev</code>, <code>next start</code></td></tr>
-            <tr><td>Astro</td><td class="port">4321</td><td><code>astro dev</code>, <code>astro preview</code></td></tr>
-            <tr><td>Wrangler</td><td class="port">8787</td><td><code>wrangler dev</code></td></tr>
-            <tr><td>Storybook</td><td class="port">6006</td><td><code>storybook dev</code></td></tr>
-            <tr><td>Uvicorn</td><td class="port">8000</td><td><code>uvicorn app:app</code></td></tr>
-            <tr><td>Flask</td><td class="port">5000</td><td><code>flask run</code></td></tr>
-            <tr><td>Rails</td><td class="port">3000</td><td><code>rails server</code></td></tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
-
-    <section class="block" aria-labelledby="limits-title">
-      <h2 id="limits-title">Limits</h2>
-      <ul class="limits">
-        <li>Only commands Claude runs through its Bash tool are checked. What you type in your own terminal is not.</li>
-        <li>Ports computed in code, such as <code>Number(process.env.PORT)</code>, are not read; the tool default is assumed.</li>
-        <li>Workspace globs are expanded one level (<code>packages/*</code>).</li>
-        <li>Tested on macOS. It relies on <code>lsof</code> and BSD <code>ps -E</code>.</li>
-        <li>If you really want a second server, confirm it and Claude prefixes the command with <code>GHOST_PROC_GUARD=allow</code>.</li>
-        <li>If the guard itself fails, the command runs as if it were not installed.</li>
-      </ul>
-    </section>
-
-    <section class="block" id="more-mods" aria-labelledby="more-title">
-      <div class="block-head">
-        <h2 id="more-title">More mods in this marketplace</h2>
-        <p>Install any of them from the same marketplace with <code>claude plugin install &lt;name&gt;@thieung-mods</code>.</p>
-      </div>
-      <div class="cases">
-        <article class="case">
-          <h3>worktree-guard</h3>
-          <p>For worktrees several sessions share. Stops <code>git add -A</code> and <code>commit -a</code> from sweeping in files this session did not touch, dry-runs <code>stash</code>, <code>checkout</code>, <code>reset --hard</code> and <code>clean</code> so you see what they would discard, and names the process behind <code>EADDRINUSE</code>.</p>
-          <a class="more-link" href="https://github.com/thieung/claude-mods/tree/main/worktree-guard">worktree-guard on GitHub</a>
-        </article>
-        <article class="case">
-          <h3>ak-cockpit</h3>
-          <p>An AgentKit band above the prompt: how full the context is, with a <strong>Handoff</strong> button at 75%, and the active plan's current phase with its checklist. Needs the <code>ak</code> CLI.</p>
-          <a class="more-link" href="https://github.com/thieung/claude-mods/tree/main/ak-cockpit">ak-cockpit on GitHub</a>
-        </article>
-        <article class="case">
           <h3>ghost-proc-guard</h3>
-          <p>The mod on this page. Pairs with worktree-guard: one names the process after a port clash, the other refuses the second launch before it happens.</p>
-          <a class="more-link" href="https://github.com/thieung/claude-mods/tree/main/ghost-proc-guard">ghost-proc-guard on GitHub</a>
-        </article>
-      </div>
+          <p class="sum" data-i18n="gp_sum">One dev server per checkout. Refuses a launch whose ports are taken, before the tool moves to the next free port.</p>
+          <code class="line">/plugin install ghost-proc-guard@thieung-mods</code>
+          <div class="go"><a href="ghost-proc-guard/" data-i18n="gp_page">Open the ghost-proc-guard page</a><a href="https://github.com/thieung/claude-mods/tree/main/ghost-proc-guard" data-i18n="src">Source</a></div>
+        </div>
+        <ul>
+          <li data-i18n="gp1">Reads ports from script flags, then vite, astro and wrangler config, then the tool default.</li>
+          <li data-i18n="gp2">Understands turbo, pnpm, nx, lerna and npm workspaces, and places each server in its git worktree.</li>
+          <li data-i18n="gp3"><code>/procs</code> lists the servers Claude started, in this session and earlier ones, and stops a whole app with one press.</li>
+        </ul>
+      </article>
+
+      <article class="mod" id="worktree-guard">
+        <img src="icons/worktree-guard.png" alt="" width="96" height="96">
+        <div>
+          <h3>worktree-guard</h3>
+          <p class="sum" data-i18n="wg_sum">For worktrees several sessions share. Keeps one session from committing or throwing away another session's work.</p>
+          <code class="line">/plugin install worktree-guard@thieung-mods</code>
+          <div class="go"><a href="https://github.com/thieung/claude-mods/tree/main/worktree-guard" data-i18n="src">Source</a></div>
+        </div>
+        <ul>
+          <li data-i18n="wg1"><code>git add -A</code>, <code>add .</code>, <code>add -u</code> and <code>commit -a</code> are checked for files that were dirty before the session began. If there are any, you choose whether the command runs.</li>
+          <li data-i18n="wg2"><code>git stash</code>, <code>checkout .</code>, <code>restore</code>, <code>reset --hard</code> and <code>clean</code> are dry-run first, so you see which files they would touch.</li>
+          <li data-i18n="wg3">After <code>EADDRINUSE</code>, a toast names the process and folder holding the port.</li>
+        </ul>
+      </article>
+
+      <article class="mod" id="ak-cockpit">
+        <img src="icons/ak-cockpit.png" alt="" width="96" height="96">
+        <div>
+          <h3>ak-cockpit</h3>
+          <p class="sum" data-i18n="ak_sum">An AgentKit band above the prompt: how full the context is, and where you are in the active plan.</p>
+          <p class="needs" data-i18n="ak_needs">Needs the <code>ak</code> CLI on <code>PATH</code> and the <code>ak:handoff</code> skill.</p>
+          <code class="line">/plugin install ak-cockpit@thieung-mods</code>
+          <div class="go"><a href="https://github.com/thieung/claude-mods/tree/main/ak-cockpit" data-i18n="src">Source</a></div>
+        </div>
+        <ul>
+          <li data-i18n="ak1">Shows context fill and how much the last turn added. At 75% (configurable) the reading turns red and a Handoff button runs <code>/ak:handoff</code>.</li>
+          <li data-i18n="ak2">Follows the newest plan in <code>plans/</code> and shows the current phase with its checked tasks.</li>
+          <li data-i18n="ak3">Press the band to open a pane with every phase and the open checklist items.</li>
+        </ul>
+      </article>
+
+      <p class="note" data-i18n="note">A mod runs with the same access as Claude Code itself: files, processes, network. Read the source before installing.</p>
     </section>
   </main>
 
   <footer>
-    <span>Mods run with the same access as Claude Code. Read the source before installing.</span>
+    <span data-i18n="license">MIT licensed. Made by <a href="https://github.com/thieung">Thieu Nguyen</a>.</span>
     <a href="https://github.com/thieung/claude-mods">github.com/thieung/claude-mods</a>
   </footer>
 </div>
 
 <script>
-document.querySelectorAll('.copy').forEach(function (button) {
-  button.addEventListener('click', function () {
-    var source = document.getElementById(button.dataset.target);
-    var text = source.textContent;
-    var done = function (label) {
-      button.textContent = label;
-      setTimeout(function () { button.textContent = 'Copy'; }, 1600);
-    };
-    var select = function () {
-      var range = document.createRange();
-      range.selectNodeContents(source);
-      var sel = window.getSelection();
-      sel.removeAllRanges();
-      sel.addRange(range);
-      done('Selected');
-    };
-    try {
-      navigator.clipboard.writeText(text).then(function () { done('Copied'); }, select);
-    } catch (err) {
-      select();
-    }
-  });
-});
+(() => {
+  const $ = id => document.getElementById(id)
+  const root = document.documentElement
+  const store = {
+    get: k => { try { return localStorage.getItem(k) } catch { return null } },
+    set: (k, v) => { try { localStorage.setItem(k, v) } catch {} },
+  }
+
+  const VI = {
+    by: 'của Thieu Nguyen',
+    nav_mods: 'Các mod',
+    h1: 'Mod nhỏ cho những checkout đông người.',
+    lede: 'Khi nhiều session Claude dùng chung một checkout, chúng khởi động server trùng nhau, commit nhầm file làm dở của nhau và lạc mất tiến độ trong các plan dài. Các mod này bắt những khoảnh khắc đó ngay trong Claude Code.',
+    what: 'Mod là plugin gồm các function hook chạy bên trong Claude Code. <a href="https://claude.dev/blog/getting-started-with-claude-code-mods/">Mod là gì?</a>',
+    install_t: 'Cài đặt',
+    install_foot: 'Chạy trong Claude Code 2.1.287 trở lên. Chỉ cần cài mod bạn dùng.',
+    pick_h: 'Bạn cần mod nào?',
+    pick_p: 'Bắt đầu từ điều vừa xảy ra.',
+    p1: 'Claude chạy lại <code>pnpm dev</code> và giờ app của bạn chạy cả trên :5173 lẫn :5174.',
+    p2: 'Server từ các session tuần trước vẫn đang giữ port.',
+    p3: '<code>git add -A</code> gom luôn file làm dở của session khác vào commit của bạn.',
+    p4: '<code>git stash</code> hoặc <code>reset --hard</code> sắp xoá mất phần việc không phải do bạn viết.',
+    p5: 'Lệnh lỗi <code>EADDRINUSE</code> và bạn không biết ai đang giữ port.',
+    p6: 'Bạn chỉ nhận ra context đã đầy khi nó bị nén, và mất dấu mình đang ở đâu trong plan.',
+    mods_h: 'Các mod',
+    mods_p: 'Không mod nào gọi mạng. README của từng mod liệt kê chương trình nó chạy, file nó đọc và dữ liệu nó lưu.',
+    gp_sum: 'Mỗi checkout, một dev server. Chặn lần khởi động có port đã bị chiếm, trước khi công cụ chuyển sang port trống kế tiếp.',
+    gp_page: 'Mở trang ghost-proc-guard',
+    src: 'Mã nguồn',
+    gp1: 'Đọc port từ flag trong script, rồi config của vite, astro, wrangler, cuối cùng là mặc định của công cụ.',
+    gp2: 'Hiểu turbo, pnpm, nx, lerna và npm workspaces, và gắn mỗi server với git worktree của nó.',
+    gp3: '<code>/procs</code> liệt kê các server Claude đã khởi động, trong session này và các session trước, và dừng cả một app chỉ với một lần bấm.',
+    wg_sum: 'Cho worktree mà nhiều session dùng chung. Không để session này commit hay xoá mất phần việc của session khác.',
+    wg1: '<code>git add -A</code>, <code>add .</code>, <code>add -u</code> và <code>commit -a</code> được kiểm tra xem có file nào đã bị sửa từ trước khi session bắt đầu. Nếu có, bạn quyết định lệnh có được chạy hay không.',
+    wg2: '<code>git stash</code>, <code>checkout .</code>, <code>restore</code>, <code>reset --hard</code> và <code>clean</code> được chạy thử trước, để bạn thấy chúng sẽ động tới file nào.',
+    wg3: 'Sau lỗi <code>EADDRINUSE</code>, một toast cho biết process và thư mục đang giữ port.',
+    ak_sum: 'Một dải AgentKit phía trên ô nhập lệnh: context đã đầy bao nhiêu, và bạn đang ở đâu trong plan hiện tại.',
+    ak_needs: 'Cần CLI <code>ak</code> trên <code>PATH</code> và skill <code>ak:handoff</code>.',
+    ak1: 'Hiển thị mức đầy của context và lượng lượt vừa rồi thêm vào. Ở mức 75% (có thể chỉnh), số chuyển đỏ và nút Handoff chạy <code>/ak:handoff</code>.',
+    ak2: 'Theo dõi plan mới nhất trong <code>plans/</code> và hiển thị phase hiện tại cùng số task đã xong.',
+    ak3: 'Bấm vào dải để mở pane liệt kê mọi phase và các mục checklist còn mở.',
+    note: 'Mod chạy với cùng quyền như Claude Code: file, process, mạng. Hãy đọc mã nguồn trước khi cài.',
+    license: 'Giấy phép MIT. Tác giả <a href="https://github.com/thieung">Thieu Nguyen</a>.',
+  }
+  const T = {
+    en: { copy: 'Copy', copied: 'Copied', copyFail: 'Select and copy', langBtn: 'Tiếng Việt', light: 'Light', dark: 'Dark', themeLabel: m => `Switch to ${m.toLowerCase()} mode` },
+    vi: { copy: 'Sao chép', copied: 'Đã chép', copyFail: 'Hãy chọn và chép', langBtn: 'English', light: 'Sáng', dark: 'Tối', themeLabel: m => `Chuyển sang giao diện ${m.toLowerCase()}` },
+  }
+
+  const EN = {}
+  document.querySelectorAll('[data-i18n]').forEach(el => { EN[el.dataset.i18n] = el.innerHTML })
+  let lang = root.lang === 'vi' ? 'vi' : (store.get('gpg-lang') ? 'en' : (navigator.language || '').toLowerCase().startsWith('vi') ? 'vi' : 'en')
+  const t = () => T[lang]
+
+  const sun = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></svg>'
+  const moon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/></svg>'
+  const dark = matchMedia('(prefers-color-scheme: dark)')
+  const isDark = () => root.dataset.theme ? root.dataset.theme === 'dark' : dark.matches
+
+  function paintTheme() {
+    const b = $('theme'), target = isDark() ? t().light : t().dark
+    b.innerHTML = `${isDark() ? sun : moon}<span>${target}</span>`
+    b.setAttribute('aria-label', t().themeLabel(target))
+  }
+  function applyLang() {
+    root.lang = lang
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+      const k = el.dataset.i18n
+      el.innerHTML = lang === 'vi' && VI[k] ? VI[k] : EN[k]
+    })
+    const lb = $('lang')
+    lb.textContent = t().langBtn
+    lb.lang = lang === 'vi' ? 'en' : 'vi'
+    $('copy').textContent = t().copy
+    paintTheme()
+  }
+
+  $('lang').addEventListener('click', () => { lang = lang === 'vi' ? 'en' : 'vi'; store.set('gpg-lang', lang); applyLang() })
+  $('theme').addEventListener('click', () => {
+    const next = isDark() ? 'light' : 'dark'
+    root.dataset.theme = next; store.set('gpg-theme', next); paintTheme()
+  })
+  dark.addEventListener('change', paintTheme)
+
+  $('copy').addEventListener('click', async e => {
+    const b = e.currentTarget
+    try { await navigator.clipboard.writeText($(b.dataset.copy).textContent); b.textContent = t().copied }
+    catch { b.textContent = t().copyFail }
+    setTimeout(() => { b.textContent = t().copy }, 1800)
+  })
+
+  applyLang()
+})()
 </script>
 </body>
 </html>
