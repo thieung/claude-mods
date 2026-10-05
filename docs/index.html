@@ -53,8 +53,11 @@
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
 body { margin: 0; background: var(--fog); color: var(--ink); font: 400 1.0625rem/1.6 var(--body); overflow-x: hidden; }
-a { color: inherit; text-decoration-color: var(--cobalt); text-underline-offset: 3px; text-decoration-thickness: 2px; }
+a { color: inherit; text-decoration: none; }
 a:hover { color: var(--cobalt); }
+/* Without underlines, links inside running text are told apart by color. */
+p a, li a, footer a, .go a { color: var(--cobalt); font-weight: 700; }
+p a:hover, li a:hover, footer a:hover, .go a:hover { color: var(--ink); }
 :focus-visible { outline: 3px solid var(--cobalt); outline-offset: 3px; }
 code { font-family: var(--code); font-size: 0.88em; }
 img { display: block; max-width: 100%; }
@@ -109,7 +112,7 @@ section.block { padding-block: 72px; border-top: 2px solid var(--ink); }
 .cases li:first-child { padding-top: 0; }
 @media (min-width: 720px) { .cases li { grid-template-columns: 1fr 200px; align-items: baseline; } }
 .cases a { font: 800 1.35rem/1.1 var(--display); text-decoration: none; color: var(--cobalt); }
-.cases a:hover { text-decoration: underline; }
+.cases a:hover { color: var(--ink); }
 
 /* Mod rows */
 .mods-head { display: grid; gap: 14px; margin-bottom: 40px; }
