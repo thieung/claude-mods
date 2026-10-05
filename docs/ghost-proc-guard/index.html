@@ -1,0 +1,562 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ghost-proc-guard</title>
+<meta name="description" content="A Claude Code mod that keeps one set of dev servers per checkout: it refuses duplicate launches on busy ports, understands monorepos and worktrees, and cleans up leftovers from a /procs pane.">
+<meta property="og:title" content="ghost-proc-guard for Claude Code">
+<meta property="og:description" content="Stops Claude from starting a second dev server on :3001 when one already runs on :3000.">
+<meta property="og:type" content="website">
+<link rel="canonical" href="https://github.com/thieung/claude-mods/tree/main/ghost-proc-guard">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M6 28V14a10 10 0 0 1 20 0v14l-3.3-2.6L19.3 28 16 25.4 12.7 28l-3.4-2.6z' fill='%233a4fd8'/%3E%3Cpath d='M4 30 28 6' stroke='%23e03e52' stroke-width='3.2' stroke-linecap='round'/%3E%3C/svg%3E">
+<script>try{var t=localStorage.getItem('gpg-theme');if(t==='light'||t==='dark')document.documentElement.dataset.theme=t;var l=localStorage.getItem('gpg-lang');if(l==='vi'||l==='en')document.documentElement.lang=l}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800;900&family=Atkinson+Hyperlegible+Next:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+:root {
+  --fog: #dde3ec;
+  --panel: #f3f6fa;
+  --ink: #161b33;
+  --muted: #4c5677;
+  --rule: #b9c3d4;
+  --cobalt: #3a4fd8;
+  --stop: #c92a3e;
+  --stop-wash: #f8dde1;
+  --live: #1f7a52;
+  --ghost: #8790ad;
+  --board: #161b33;
+  --board-ink: #e8ecf8;
+  --board-dim: #8e97b8;
+  --board-rule: #2b3256;
+  --display: "Big Shoulders Display", "Arial Narrow", sans-serif;
+  --body: "Atkinson Hyperlegible Next", "Helvetica Neue", Arial, sans-serif;
+  --code: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --fog: #12162b; --panel: #1a2040; --ink: #e6eaf7; --muted: #a3abc9; --rule: #2e3660;
+    --cobalt: #8d9cff; --stop: #ff6b7d; --stop-wash: #3a1d2a; --live: #5fd39b; --ghost: #737ca0;
+    --board: #0c0f1f; --board-rule: #262c4d;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --fog: #12162b; --panel: #1a2040; --ink: #e6eaf7; --muted: #a3abc9; --rule: #2e3660;
+  --cobalt: #8d9cff; --stop: #ff6b7d; --stop-wash: #3a1d2a; --live: #5fd39b; --ghost: #737ca0;
+  --board: #0c0f1f; --board-rule: #262c4d;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--fog);
+  color: var(--ink);
+  font: 400 1.0625rem/1.6 var(--body);
+  overflow-x: hidden;
+}
+a { color: inherit; text-decoration-color: var(--cobalt); text-underline-offset: 3px; text-decoration-thickness: 2px; }
+a:hover { color: var(--cobalt); }
+:focus-visible { outline: 3px solid var(--cobalt); outline-offset: 3px; }
+code { font-family: var(--code); font-size: 0.88em; }
+.wrap { max-width: 1180px; margin-inline: auto; padding-inline: 16px; }
+@media (min-width: 720px) { .wrap { padding-inline: 32px; } }
+
+/* Header */
+.site { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: 20px; }
+.mark { display: inline-flex; align-items: center; gap: 10px; font: 800 1.5rem/1 var(--display); letter-spacing: 0.01em; text-decoration: none; }
+.mark svg { width: 28px; height: 28px; }
+.site { flex-wrap: wrap; }
+.site nav { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 22px; font-size: 0.95rem; }
+.prefs { display: inline-flex; gap: 8px; }
+.pref {
+  appearance: none; display: inline-flex; align-items: center; gap: 6px; background: transparent; color: var(--ink);
+  border: 1.5px solid var(--rule); border-radius: 5px; padding: 6px 10px; font: 700 0.85rem/1 var(--body); cursor: pointer;
+}
+.pref:hover { border-color: var(--cobalt); color: var(--cobalt); }
+.pref svg { width: 15px; height: 15px; }
+
+/* Hero */
+.hero { display: grid; gap: 40px; padding-block: 40px 72px; align-items: start; }
+@media (min-width: 980px) { .hero { grid-template-columns: 0.9fr 1.1fr; gap: 56px; padding-top: 64px; } }
+h1, h2, h3 { margin: 0; font-family: var(--display); line-height: 0.95; text-wrap: balance; }
+h1 { font-weight: 900; font-size: clamp(3.2rem, 9vw, 6.2rem); letter-spacing: -0.005em; }
+h2 { font-weight: 800; font-size: clamp(2.2rem, 5vw, 3.4rem); }
+/* Vietnamese headlines run longer and carry stacked diacritics. */
+:lang(vi) h1 { font-size: clamp(3rem, 7vw, 5rem); line-height: 1.02; }
+:lang(vi) h2 { line-height: 1.05; }
+h3 { font-weight: 800; font-size: 1.6rem; line-height: 1.05; }
+p { margin: 0; max-width: 62ch; }
+.lede { margin-top: 24px; font-size: 1.25rem; line-height: 1.5; color: var(--muted); max-width: 40ch; }
+.actions { margin-top: 32px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.btn {
+  appearance: none; border: 2px solid var(--ink); border-radius: 6px; background: var(--ink); color: var(--fog);
+  font: 700 1rem/1 var(--body); padding: 14px 20px; cursor: pointer; text-decoration: none; display: inline-block;
+}
+.btn:hover { background: var(--cobalt); border-color: var(--cobalt); color: #fff; }
+.btn.quiet { background: transparent; color: var(--ink); }
+.btn.quiet:hover { color: #fff; }
+.req { margin-top: 18px; font-size: 0.92rem; color: var(--muted); }
+
+/* Port board: the interactive demo */
+.board { background: var(--board); color: var(--board-ink); border-radius: 10px; overflow: hidden; box-shadow: 0 30px 60px -30px rgba(22, 27, 51, 0.55); }
+.board-top { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--board-rule); }
+.board-title { font: 800 1.35rem/1 var(--display); letter-spacing: 0.02em; }
+.board-title small { font: 400 0.9rem var(--body); color: var(--board-dim); margin-left: 8px; letter-spacing: 0; }
+.switch { display: inline-flex; align-items: center; gap: 10px; font-size: 0.95rem; cursor: pointer; user-select: none; }
+.switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.track { width: 46px; height: 26px; border-radius: 6px; background: #3a4166; position: relative; transition: background 0.2s; flex: none; }
+.track::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 4px; background: #fff; transition: transform 0.2s; }
+.switch input:checked + .track { background: var(--cobalt); }
+.switch input:checked + .track::after { transform: translateX(20px); }
+.switch input:focus-visible + .track { outline: 3px solid #8d9cff; outline-offset: 3px; }
+
+.rows { list-style: none; margin: 0; padding: 0; min-height: 268px; }
+.row {
+  display: grid; grid-template-columns: 112px 1fr auto; gap: 4px 16px; align-items: center;
+  padding: 14px 20px; border-bottom: 1px solid var(--board-rule);
+}
+.port { font: 900 2.6rem/1 var(--display); font-variant-numeric: tabular-nums; }
+.row .what { min-width: 0; }
+.row .cmd { font-family: var(--code); font-size: 0.85rem; overflow-wrap: anywhere; }
+.row .meta { font-size: 0.85rem; color: var(--board-dim); }
+.state { font-size: 0.85rem; font-weight: 700; display: flex; margin-bottom: 2px; align-items: center; gap: 6px; }
+.state::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: currentColor; }
+.row.live .state { color: #5fd39b; }
+.row.ghost { color: var(--board-dim); }
+.row.ghost .port { color: transparent; -webkit-text-stroke: 1.2px #737ca0; }
+.row.ghost .state { color: #b6a3ff; }
+.row.ghost .state::before { background: transparent; border: 1.5px dashed currentColor; }
+.row .stopbtn {
+  grid-column: 3; appearance: none; background: transparent; color: var(--board-ink); border: 1px solid #4a527a;
+  border-radius: 5px; font: 700 0.85rem var(--body); padding: 7px 12px; cursor: pointer;
+}
+.row .stopbtn:hover { border-color: #ff6b7d; color: #ff9aa6; }
+.row.enter { animation: drift 0.7s cubic-bezier(.2,.7,.2,1); }
+@keyframes drift { from { opacity: 0; transform: translateY(-10px); filter: blur(3px); } }
+.row.flash { animation: flash 0.9s ease-out; }
+@keyframes flash { 0%, 30% { background: rgba(255, 107, 125, 0.22); } }
+.empty { padding: 28px 20px; color: var(--board-dim); }
+
+.console { border-top: 1px solid var(--board-rule); padding: 16px 20px 18px; display: grid; gap: 12px; }
+.prompt { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+.prompt .ask { font-size: 0.95rem; color: var(--board-dim); }
+.prompt .ask b { color: var(--board-ink); font-family: var(--code); font-weight: 500; }
+.runbtn { appearance: none; border: 0; border-radius: 6px; background: var(--board-ink); color: var(--board); font: 700 0.95rem/1 var(--body); padding: 12px 16px; cursor: pointer; }
+.runbtn:hover { background: #fff; }
+.out {
+  margin: 0; font: 0.8rem/1.55 var(--code); white-space: pre-wrap; overflow-wrap: anywhere;
+  color: #c7cde4; background: rgba(255,255,255,0.04); border-radius: 6px; padding: 12px 14px; min-height: 5.2em;
+}
+.out .deny { color: #ff8b99; }
+.out .dim { color: var(--board-dim); }
+.statusline { display: flex; justify-content: space-between; gap: 12px; font-size: 0.8rem; color: var(--board-dim); }
+.statusline span:last-child { font-family: var(--code); color: var(--board-ink); }
+
+.hero > *, .split > *, .pane-wrap > *, .install > *, .fine > *, .case > * { min-width: 0; }
+
+/* Sections */
+section.block { padding-block: 72px; border-top: 2px solid var(--ink); }
+.split { display: grid; gap: 28px; }
+@media (min-width: 900px) { .split { grid-template-columns: 300px 1fr; gap: 56px; } }
+.split > header p { margin-top: 14px; color: var(--muted); }
+
+.cases { display: grid; gap: 0; }
+.case { display: grid; gap: 10px; padding: 26px 0; border-bottom: 1px solid var(--rule); }
+.case:first-child { padding-top: 0; }
+@media (min-width: 720px) { .case { grid-template-columns: 220px 1fr; gap: 28px; } }
+.case p + p { margin-top: 10px; }
+.case .eg { color: var(--muted); font-size: 0.95rem; }
+
+/* /procs pane mock */
+.pane-wrap { display: grid; gap: 32px; align-items: start; }
+@media (min-width: 980px) { .pane-wrap { grid-template-columns: 1fr 1fr; gap: 56px; } }
+.pane-copy p { margin-top: 16px; }
+.pane-copy ul { margin: 18px 0 0; padding-left: 1.1em; }
+.pane-copy li + li { margin-top: 8px; }
+.term { white-space: pre; background: var(--board); color: var(--board-ink); border-radius: 10px; font: 0.86rem/1.7 var(--code); padding: 20px 22px; overflow-x: auto; }
+.term .h { font-weight: 500; color: #fff; }
+.term .g { color: #5fd39b; }
+.term .d { color: var(--board-dim); }
+.term .k { border: 1px solid #4a527a; border-radius: 4px; padding: 0 6px; color: var(--board-ink); }
+.term .toast { display: block; margin-top: 18px; padding-top: 14px; border-top: 1px dashed var(--board-rule); color: #b6a3ff; white-space: normal; }
+
+/* Install */
+.install { display: grid; gap: 28px; }
+@media (min-width: 900px) { .install { grid-template-columns: 1fr 1fr; gap: 56px; align-items: start; } }
+.cmds { position: relative; background: var(--panel); border: 2px solid var(--ink); border-radius: 10px; padding: 20px 22px; }
+.cmds pre { margin: 0; font: 0.95rem/1.85 var(--code); overflow-x: auto; }
+.copy { position: absolute; top: 12px; right: 12px; appearance: none; border: 1px solid var(--rule); background: var(--fog); color: var(--ink); border-radius: 5px; padding: 6px 10px; font: 700 0.85rem var(--body); cursor: pointer; }
+.copy:hover { border-color: var(--cobalt); }
+.note { margin-top: 18px; padding: 14px 16px; border-left: 4px solid var(--stop); background: var(--stop-wash); border-radius: 0 6px 6px 0; font-size: 0.95rem; }
+
+.fine { display: grid; gap: 40px; }
+@media (min-width: 900px) { .fine { grid-template-columns: 1fr 1fr; gap: 56px; } }
+.fine ul { margin: 16px 0 0; padding-left: 1.1em; }
+.fine li + li { margin-top: 10px; }
+.fine p { margin-top: 16px; }
+
+footer { border-top: 2px solid var(--ink); padding-block: 28px 48px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; font-size: 0.92rem; color: var(--muted); }
+
+@media (max-width: 560px) {
+  .row { grid-template-columns: 1fr auto; }
+  .port { font-size: 2.2rem; }
+  .row .what { grid-column: 1 / -1; grid-row: 2; }
+  .row .stopbtn { grid-column: 2; grid-row: 1; }
+  .site nav a.hide-sm { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="site">
+    <a class="mark" href="#top" aria-label="ghost-proc-guard home">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M6 28V14a10 10 0 0 1 20 0v14l-3.3-2.6L19.3 28 16 25.4 12.7 28l-3.4-2.6z" fill="var(--cobalt)"/><path d="M4 30 28 6" stroke="var(--stop)" stroke-width="3.2" stroke-linecap="round"/></svg>
+      ghost-proc-guard
+    </a>
+    <nav aria-label="Page">
+      <a class="hide-sm" href="#procs">/procs</a>
+      <a href="#install" data-i18n="nav_install">Install</a>
+      <a href="https://github.com/thieung/claude-mods/tree/main/ghost-proc-guard" data-i18n="nav_source">Source</a>
+      <span class="prefs">
+        <button class="pref" id="lang" type="button"></button>
+        <button class="pref" id="theme" type="button"></button>
+      </span>
+    </nav>
+  </header>
+
+  <main id="top">
+    <div class="hero">
+      <div>
+        <h1 data-i18n="h1">One dev server per checkout.</h1>
+        <p class="lede" data-i18n="lede">Claude forgets a server is running, starts another, and the tool quietly moves to the next free port. ghost-proc-guard stops that launch and tells Claude which server already holds the port.</p>
+        <div class="actions">
+          <a class="btn" href="#install" data-i18n="cta1">Install the mod</a>
+          <a class="btn quiet" href="https://github.com/thieung/claude-mods/tree/main/ghost-proc-guard" data-i18n="cta2">Read the source</a>
+        </div>
+        <p class="req" data-i18n="req">A Claude Code mod. Needs Claude Code 2.1.287 or later. Tested on macOS.</p>
+      </div>
+
+      <div class="board" aria-labelledby="board-title">
+        <div class="board-top">
+          <div class="board-title" id="board-title">~/shop/apps/web <small data-i18n="board_sub">listening ports</small></div>
+          <label class="switch">
+            <input type="checkbox" id="guard">
+            <span class="track" aria-hidden="true"></span>
+            <span id="guard-label">Guard off</span>
+          </label>
+        </div>
+        <ul class="rows" id="rows" aria-live="polite"></ul>
+        <div class="console">
+          <div class="prompt">
+            <span class="ask" data-i18n="ask">A new session asks Claude to run <b>pnpm dev</b></span>
+            <button class="runbtn" id="run" type="button" data-i18n="run">Run pnpm dev</button>
+          </div>
+          <pre class="out" id="out" aria-live="polite"></pre>
+          <div class="statusline"><span data-i18n="statusline">Claude Code status line</span><span id="status"></span></div>
+        </div>
+      </div>
+    </div>
+
+    <section class="block" aria-labelledby="catches">
+      <div class="split">
+        <header>
+          <h2 id="catches" data-i18n="catches_h">What the guard checks</h2>
+          <p data-i18n="catches_p">Every dev command Claude runs through its Bash tool is read before it starts.</p>
+        </header>
+        <div class="cases">
+          <div class="case">
+            <h3 data-i18n="c1_h">Duplicate launches</h3>
+            <div>
+              <p data-i18n="c1_p">The guard works out which ports the launch will bind and refuses it if one is taken, or if a server already runs from the same folder. Claude gets the owner: command, folder, launching session and process ids, plus what to do next.</p>
+              <p class="eg" data-i18n="c1_eg"><code>npm run dev</code>, <code>pnpm dev</code>, <code>vite</code>, <code>next dev</code>, <code>astro dev</code>, <code>wrangler dev</code>, <code>uvicorn</code>, <code>python -m http.server</code> and more.</p>
+            </div>
+          </div>
+          <div class="case">
+            <h3 data-i18n="c2_h">Monorepos</h3>
+            <div>
+              <p data-i18n="c2_p">For turbo, <code>pnpm -r</code> / <code>--filter</code>, nx, lerna and npm workspaces, it reads every package that runs the task. Each port comes from the script flag, then the tool's config (<code>vite.config</code>, <code>astro.config</code>, <code>wrangler.toml</code>), then the tool's default.</p>
+            </div>
+          </div>
+          <div class="case">
+            <h3 data-i18n="c3_h">Worktrees</h3>
+            <div>
+              <p data-i18n="c3_p">Each server is placed in its git worktree, including ones nested under <code>.claude/worktrees/</code>. A worktree launch that needs a port another checkout holds is refused, with a warning not to reuse a server running other code.</p>
+            </div>
+          </div>
+          <div class="case">
+            <h3 data-i18n="c4_h">Who started what</h3>
+            <div>
+              <p data-i18n="c4_p">Launches carry <code>GHOST_PROC_GUARD_SESSION=&lt;session id&gt;</code> in their environment, so each server stays attributed to the session that started it, even after that session is gone.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="block" id="procs" aria-labelledby="procs-h">
+      <div class="pane-wrap">
+        <div class="pane-copy">
+          <h2 id="procs-h" data-i18n="procs_h">Clean up with /procs</h2>
+          <p data-i18n="procs_p">Type <code>/procs</code> to open a pane with the servers Claude started, in this session and earlier ones, and the other servers in the project. One row per app.</p>
+          <ul>
+            <li data-i18n="procs_l1"><strong>Stop</strong> sends <code>TERM</code> to the whole app process tree. Press again to send <code>KILL</code>.</li>
+            <li data-i18n="procs_l2">Claude's own processes and your interactive shells are never touched.</li>
+            <li data-i18n="procs_l3">A new session warns about servers left running by earlier ones, and the status line shows how many are running.</li>
+          </ul>
+        </div>
+        <div class="term" role="img" aria-label="Mock of the Dev processes pane listing two servers started by Claude and one untracked server"><span class="h">Dev processes</span>
+
+<span class="h">Started by Claude</span>
+<span class="g">● :3000</span> pid 48213  <span class="d">this session ~/shop/apps/web</span>  <span class="k">Stop</span>
+<span class="g">● :8787</span> pid 47102  <span class="d">session 3f2a91c0 ~/shop/apps/api</span>  <span class="k">Stop</span>
+<span class="d">○ :4321 pid 45518  session 9bd0e4a7 ~/shop/apps/docs</span>
+
+<span class="h">Other servers in this project</span>
+<span class="g">● :6006</span> pid 44090  <span class="d">untracked ~/shop/packages/ui</span>  <span class="k">Stop</span>
+
+<span class="k">r</span> Refresh  <span class="k">f</span> Forget stopped
+<span class="toast">ghost-proc-guard: 1 dev server(s) from earlier sessions still running here (:8787). /procs to review.</span></div>
+      </div>
+    </section>
+
+    <section class="block" id="install" aria-labelledby="install-h">
+      <div class="install">
+        <div>
+          <h2 id="install-h" data-i18n="install_h">Install</h2>
+          <p style="margin-top:16px" data-i18n="install_p">Run these inside Claude Code. The mod lives in the <code>thieung-mods</code> marketplace, next to worktree-guard and ak-cockpit.</p>
+          <p class="note" data-i18n="install_note">A mod runs with the same access as Claude Code itself: files, processes, network. Read the source before installing.</p>
+        </div>
+        <div class="cmds">
+          <button class="copy" id="copy" type="button">Copy</button>
+<pre id="cmds">/plugin marketplace add thieung/claude-mods
+/plugin install ghost-proc-guard@thieung-mods
+/reload-plugins</pre>
+        </div>
+      </div>
+    </section>
+
+    <section class="block" aria-labelledby="fine-h">
+      <div class="fine">
+        <div>
+          <h2 id="fine-h" data-i18n="fine_h">When you want two</h2>
+          <p data-i18n="fine_p1">Tell Claude to prefix the command with <code>GHOST_PROC_GUARD=allow</code>. The guard asks Claude to do this only after you confirm, so a second server is always your call.</p>
+          <p data-i18n="fine_p2">If a hook fails, the command runs as if the guard were absent.</p>
+        </div>
+        <div>
+          <h2 data-i18n="limits_h">Limits</h2>
+          <ul>
+            <li data-i18n="l1">Only commands Claude runs through its Bash tool are checked. What you type in your own terminal is not.</li>
+            <li data-i18n="l2">Ports computed in code, such as <code>Number(process.env.PORT)</code>, are not read; the tool default is assumed.</li>
+            <li data-i18n="l3">Workspace globs are expanded one level (<code>packages/*</code>); <code>**</code> globs are skipped.</li>
+            <li data-i18n="l4">macOS only for now. It relies on <code>lsof</code> and BSD <code>ps -E</code> for session attribution.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <span data-i18n="footer_by">ghost-proc-guard 0.1.0 by <a href="https://github.com/thieung">thieung</a></span>
+    <a href="https://github.com/thieung/claude-mods">github.com/thieung/claude-mods</a>
+  </footer>
+</div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id)
+  const root = document.documentElement
+  const store = {
+    get: k => { try { return localStorage.getItem(k) } catch { return null } },
+    set: (k, v) => { try { localStorage.setItem(k, v) } catch {} },
+  }
+
+  const VI = {
+    nav_install: 'Cài đặt',
+    nav_source: 'Mã nguồn',
+    h1: 'Mỗi checkout, một dev server.',
+    lede: 'Claude quên rằng một server đang chạy, khởi động thêm cái nữa, và công cụ lặng lẽ chuyển sang port trống kế tiếp. ghost-proc-guard chặn lần khởi động đó và cho Claude biết server nào đang giữ port.',
+    cta1: 'Cài mod',
+    cta2: 'Đọc mã nguồn',
+    req: 'Một mod cho Claude Code. Cần Claude Code 2.1.287 trở lên. Đã thử trên macOS.',
+    board_sub: 'các port đang lắng nghe',
+    ask: 'Một session mới nhờ Claude chạy <b>pnpm dev</b>',
+    run: 'Chạy pnpm dev',
+    statusline: 'Thanh trạng thái Claude Code',
+    catches_h: 'Guard kiểm tra những gì',
+    catches_p: 'Mọi lệnh dev mà Claude chạy qua công cụ Bash đều được đọc trước khi khởi động.',
+    c1_h: 'Khởi động trùng lặp',
+    c1_p: 'Guard tính ra những port mà lần khởi động sẽ dùng, và từ chối nếu một port đã bị chiếm hoặc đã có server chạy từ cùng thư mục. Claude nhận được thông tin chủ sở hữu: lệnh, thư mục, session đã khởi động và process id, kèm bước nên làm tiếp.',
+    c1_eg: '<code>npm run dev</code>, <code>pnpm dev</code>, <code>vite</code>, <code>next dev</code>, <code>astro dev</code>, <code>wrangler dev</code>, <code>uvicorn</code>, <code>python -m http.server</code> và nhiều lệnh khác.',
+    c2_h: 'Monorepo',
+    c2_p: 'Với turbo, <code>pnpm -r</code> / <code>--filter</code>, nx, lerna và npm workspaces, guard đọc mọi package chạy task đó. Port của từng package lấy từ flag trong script, rồi đến config của công cụ (<code>vite.config</code>, <code>astro.config</code>, <code>wrangler.toml</code>), cuối cùng là giá trị mặc định của công cụ.',
+    c3_h: 'Worktree',
+    c3_p: 'Mỗi server được gắn với git worktree của nó, kể cả worktree lồng trong <code>.claude/worktrees/</code>. Worktree cần port mà một checkout khác đang giữ sẽ bị từ chối, kèm cảnh báo không dùng lại server đang chạy code khác.',
+    c4_h: 'Ai khởi động cái gì',
+    c4_p: 'Mỗi lần khởi động mang theo <code>GHOST_PROC_GUARD_SESSION=&lt;session id&gt;</code> trong biến môi trường, nên server luôn gắn với session đã tạo ra nó, kể cả khi session đó đã kết thúc.',
+    procs_h: 'Dọn dẹp bằng /procs',
+    procs_p: 'Gõ <code>/procs</code> để mở pane liệt kê các server Claude đã khởi động, trong session này và các session trước, cùng các server khác trong project. Mỗi app một dòng.',
+    procs_l1: '<strong>Stop</strong> gửi <code>TERM</code> tới toàn bộ cây process của app. Bấm lần nữa để gửi <code>KILL</code>.',
+    procs_l2: 'Process của chính Claude và các shell tương tác của bạn không bao giờ bị động tới.',
+    procs_l3: 'Session mới sẽ cảnh báo về các server mà session trước để lại, và thanh trạng thái hiển thị số server đang chạy.',
+    install_h: 'Cài đặt',
+    install_p: 'Chạy các lệnh này trong Claude Code. Mod nằm trong marketplace <code>thieung-mods</code>, cùng với worktree-guard và ak-cockpit.',
+    install_note: 'Mod chạy với cùng quyền như Claude Code: file, process, mạng. Hãy đọc mã nguồn trước khi cài.',
+    fine_h: 'Khi bạn thật sự cần hai server',
+    fine_p1: 'Bảo Claude thêm tiền tố <code>GHOST_PROC_GUARD=allow</code> vào lệnh. Guard chỉ gợi ý Claude làm vậy sau khi bạn xác nhận, nên server thứ hai luôn do bạn quyết định.',
+    fine_p2: 'Nếu hook gặp lỗi, lệnh vẫn chạy như khi không có guard.',
+    limits_h: 'Giới hạn',
+    l1: 'Chỉ kiểm tra lệnh Claude chạy qua công cụ Bash. Lệnh bạn tự gõ trong terminal thì không.',
+    l2: 'Port tính trong code, như <code>Number(process.env.PORT)</code>, không được đọc; guard giả định port mặc định của công cụ.',
+    l3: 'Glob của workspace chỉ được mở một cấp (<code>packages/*</code>); glob <code>**</code> bị bỏ qua.',
+    l4: 'Hiện chỉ hỗ trợ macOS. Guard dựa vào <code>lsof</code> và BSD <code>ps -E</code> để xác định session.',
+    footer_by: 'ghost-proc-guard 0.1.0, tác giả <a href="https://github.com/thieung">thieung</a>',
+  }
+
+  // Strings the demo builds at runtime. Tool output (vite, the guard's refusal) stays in English, as Claude sees it.
+  const T = {
+    en: {
+      on: 'Guard on', off: 'Guard off', live: 'Listening', ghost: 'Orphaned', cur: 'current session', left: 'left by session',
+      empty: 'No dev servers running. The next launch starts on :3000.', stopLabel: p => `Stop the server on port ${p}`,
+      stopped: p => `Stopped :${p}.`, intro: 'Three sessions, three servers. Run it again, then turn the guard on.',
+      onMsg: 'ghost-proc-guard is on. Run pnpm dev again, or stop the leftovers.', offMsg: 'Guard off. Each new session starts its own server.',
+      copy: 'Copy', copied: 'Copied', copyFail: 'Select and copy',
+      langBtn: 'Tiếng Việt', light: 'Light', dark: 'Dark', themeLabel: m => `Switch to ${m} mode`,
+    },
+    vi: {
+      on: 'Bật guard', off: 'Tắt guard', live: 'Đang chạy', ghost: 'Bị bỏ rơi', cur: 'session hiện tại', left: 'để lại bởi session',
+      empty: 'Không có dev server nào. Lần khởi động tiếp theo sẽ dùng :3000.', stopLabel: p => `Dừng server trên port ${p}`,
+      stopped: p => `Đã dừng :${p}.`, intro: 'Ba session, ba server. Chạy thêm lần nữa, rồi bật guard.',
+      onMsg: 'ghost-proc-guard đang bật. Chạy lại pnpm dev, hoặc dừng các server còn sót.', offMsg: 'Guard đang tắt. Mỗi session mới tự khởi động server riêng.',
+      copy: 'Sao chép', copied: 'Đã chép', copyFail: 'Hãy chọn và chép',
+      langBtn: 'English', light: 'Sáng', dark: 'Tối', themeLabel: m => `Chuyển sang giao diện ${m.toLowerCase()}`,
+    },
+  }
+
+  const EN = {}
+  document.querySelectorAll('[data-i18n]').forEach(el => { EN[el.dataset.i18n] = el.innerHTML })
+  let lang = root.lang === 'vi' ? 'vi' : (store.get('gpg-lang') ? 'en' : (navigator.language || '').toLowerCase().startsWith('vi') ? 'vi' : 'en')
+  const t = () => T[lang]
+
+  const rowsEl = $('rows'), out = $('out'), status = $('status'), guard = $('guard'), label = $('guard-label')
+  const hex = () => Math.random().toString(16).slice(2, 10)
+  let pid = 48213
+  let msg = () => `<span class="dim">${t().intro}</span>`
+  let rows = [
+    { port: 3000, kind: 'ghost', session: '9bd0e4a7', pids: [45518, 45519] },
+    { port: 3001, kind: 'ghost', session: '3f2a91c0', pids: [47102, 47103] },
+    { port: 3002, kind: 'live', session: 'c41e07b2', pids: [48213, 48214] },
+  ]
+  const esc = s => s.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]))
+  const say = fn => { msg = fn; out.innerHTML = fn() }
+
+  function render(fresh, flash) {
+    rowsEl.innerHTML = ''
+    if (rows.length === 0) rowsEl.innerHTML = `<li class="empty">${t().empty}</li>`
+    rows.forEach((r, i) => {
+      const li = document.createElement('li')
+      li.className = `row ${r.kind}${i === fresh ? ' enter' : ''}${flash && r.port === 3000 ? ' flash' : ''}`
+      li.innerHTML = `
+        <span class="port">:${r.port}</span>
+        <span class="what">
+          <span class="state">${r.kind === 'live' ? t().live : t().ghost}</span>
+          <span class="cmd">vite</span>
+          <span class="meta">${r.kind === 'live' ? t().cur : t().left} ${r.session}, pid ${r.pids.join(' ')}</span>
+        </span>`
+      if (guard.checked) {
+        const b = document.createElement('button')
+        b.type = 'button'; b.className = 'stopbtn'; b.textContent = 'Stop'
+        b.setAttribute('aria-label', t().stopLabel(r.port))
+        b.onclick = () => {
+          rows = rows.filter(x => x !== r)
+          say(() => `<span class="dim">kill -TERM ${r.pids.join(' ')}</span>\n${t().stopped(r.port)}`)
+          render()
+        }
+        li.appendChild(b)
+      }
+      rowsEl.appendChild(li)
+    })
+    status.textContent = rows.length ? `procs: ${rows.length} running · /procs` : ''
+  }
+
+  function run() {
+    const busy = rows.find(r => r.port === 3000) || rows[0]
+    if (guard.checked && busy) {
+      const taken = rows.some(r => r.port === 3000)
+      const lines = rows.map(r => `- vite on :${r.port} [cwd ~/shop/apps/web] (started by Claude session ${r.session}); processes: ${r.pids.join(' ')}`)
+      const text = `<span class="deny">${esc(`ghost-proc-guard: ${taken ? 'Port 3000 is already in use.' : 'A server is already listening from ~/shop/apps/web.'} Not starting another dev server.`)}</span>\n${esc(lines.join('\n'))}\n<span class="dim">Next step: if that server belongs to this project or worktree, reuse it instead of starting a new one or moving to another port.</span>`
+      say(() => text)
+      render(-1, true)
+      return
+    }
+    rows.forEach(r => { r.kind = 'ghost' })
+    let port = 3000
+    while (rows.some(r => r.port === port)) port++
+    pid += 7
+    rows.push({ port, kind: 'live', session: hex(), pids: [pid, pid + 1] })
+    rows.sort((a, b) => a.port - b.port)
+    const text = `${port !== 3000 ? 'Port 3000 is in use, trying another one...\n' : ''}  VITE ready\n  <span class="dim">➜  Local:</span>   http://localhost:${port}/`
+    say(() => text)
+    render(rows.findIndex(r => r.port === port))
+  }
+
+  const sun = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></svg>'
+  const moon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/></svg>'
+  const dark = matchMedia('(prefers-color-scheme: dark)')
+  const isDark = () => root.dataset.theme ? root.dataset.theme === 'dark' : dark.matches
+
+  function paintTheme() {
+    const b = $('theme'), target = isDark() ? t().light : t().dark
+    b.innerHTML = `${isDark() ? sun : moon}<span>${target}</span>`
+    b.setAttribute('aria-label', t().themeLabel(target))
+  }
+
+  function applyLang() {
+    root.lang = lang
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+      const k = el.dataset.i18n
+      el.innerHTML = lang === 'vi' && VI[k] ? VI[k] : EN[k]
+    })
+    const lb = $('lang')
+    lb.textContent = t().langBtn
+    lb.lang = lang === 'vi' ? 'en' : 'vi'
+    label.textContent = guard.checked ? t().on : t().off
+    $('copy').textContent = t().copy
+    out.innerHTML = msg()
+    paintTheme()
+    render()
+  }
+
+  $('lang').addEventListener('click', () => { lang = lang === 'vi' ? 'en' : 'vi'; store.set('gpg-lang', lang); applyLang() })
+  $('theme').addEventListener('click', () => {
+    const next = isDark() ? 'light' : 'dark'
+    root.dataset.theme = next; store.set('gpg-theme', next); paintTheme()
+  })
+  dark.addEventListener('change', paintTheme)
+
+  guard.addEventListener('change', () => {
+    label.textContent = guard.checked ? t().on : t().off
+    say(() => `<span class="dim">${guard.checked ? t().onMsg : t().offMsg}</span>`)
+    render()
+  })
+  $('run').addEventListener('click', run)
+
+  $('copy').addEventListener('click', async e => {
+    const b = e.currentTarget
+    try { await navigator.clipboard.writeText($('cmds').textContent); b.textContent = t().copied }
+    catch { b.textContent = t().copyFail }
+    setTimeout(() => { b.textContent = t().copy }, 1800)
+  })
+
+  applyLang()
+})()
+</script>
+</body>
+</html>
